@@ -31,31 +31,4 @@ It provides a modern GUI for managing hotel rooms, bookings, and customer record
 
 ## 🗄 Database Setup
 
-Run this SQL before starting project:
-
-```sql
-CREATE DATABASE hotel_db;
-
-USE hotel_db;
-
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(100),
-    password VARCHAR(100)
-);
-
-CREATE TABLE rooms (
-    room_no INT PRIMARY KEY,
-    type VARCHAR(50),
-    price INT,
-    status VARCHAR(50)
-);
-
-CREATE TABLE bookings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100),
-    phone VARCHAR(20),
-    room_no INT,
-    days INT,
-    bill INT
-);
+Run SQL Queries before starting project
