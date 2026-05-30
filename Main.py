@@ -343,9 +343,11 @@ def show_rooms(frame):
         status = r[3]
 
         if status == "Available":
-            color = "#16a34a"
+            color = "#16a34a"   # green
+        elif status == "Booked":
+            color = "#dc2626"   # red
         else:
-            color = "#dc2626"
+            color = "#f59e0b"   # yellow
 
         badge = ctk.CTkLabel(
             card,
@@ -366,92 +368,118 @@ def show_rooms(frame):
             row += 1
 
 
-
+#ShowBooking
 #Showing Booking
 def show_booking(frame):
 
     for widget in frame.winfo_children():
         widget.destroy()
 
-    # TITLE
     ctk.CTkLabel(
         frame,
         text="BOOK ROOM",
         font=("Arial", 24, "bold")
     ).pack(pady=20)
 
-    # CENTER CARD
     card = ctk.CTkFrame(
         frame,
-        width=420,
-        height=420,
+        width=450,
+        height=520,
         fg_color="#1e1e1e",
         corner_radius=20
     )
     card.pack(pady=20)
     card.pack_propagate(False)
 
-    # FORM TITLE
     ctk.CTkLabel(
         card,
         text="Enter Booking Details",
-        font=("Arial", 18, "bold")
+        font=("Arial",18,"bold")
     ).pack(pady=15)
 
-    # INPUT FIELDS
-    name = ctk.CTkEntry(card, placeholder_text="Customer Name", width=300, height=40)
+    name = ctk.CTkEntry(card, placeholder_text="Customer Name", width=320, height=40)
     name.pack(pady=8)
 
-    phone = ctk.CTkEntry(card, placeholder_text="Phone Number", width=300, height=40)
+    phone = ctk.CTkEntry(card, placeholder_text="Phone Number", width=320, height=40)
     phone.pack(pady=8)
 
-    room = ctk.CTkEntry(card, placeholder_text="Room No", width=300, height=40)
+    room = ctk.CTkEntry(card, placeholder_text="Room No", width=320, height=40)
     room.pack(pady=8)
 
-    days = ctk.CTkEntry(card, placeholder_text="Number of Days", width=300, height=40)
+    days = ctk.CTkEntry(card, placeholder_text="Number of Days", width=320, height=40)
     days.pack(pady=8)
 
-    # BOOK FUNCTION
     def book():
 
         if not name.get() or not phone.get() or not room.get() or not days.get():
-            messagebox.showerror("Error", "All fields are required")
+            messagebox.showerror("Error","All fields required")
             return
 
-        try:
-            conn = connect()
-            cur = conn.cursor()
+        conn = connect()
+        cur = conn.cursor()
 
-            bill = int(days.get()) * 1500
+        from datetime import date, timedelta
 
-            cur.execute("""
-                INSERT INTO bookings(name, phone, room_no, days, bill)
-                VALUES(%s, %s, %s, %s, %s)
-            """, (name.get(), phone.get(), room.get(), days.get(), bill))
+        bill = int(days.get()) * 1500
 
-            conn.commit()
+        check_in = date.today()
+        check_out = check_in + timedelta(days=int(days.get()))
 
-            messagebox.showinfo("Success", f"Room Booked Successfully!\nBill: ₹{bill}")
+        # INSERT BOOKING
+        cur.execute("""
+        INSERT INTO bookings
+        (name,phone,room_no,days,bill,status,booking_date)
+        VALUES(%s,%s,%s,%s,%s,'Booked',NOW())
+        """,
+        (
+            name.get(),
+            phone.get(),
+            room.get(),
+            days.get(),
+            bill
+        ))
 
-            # CLEAR FIELDS
-            name.delete(0, "end")
-            phone.delete(0, "end")
-            room.delete(0, "end")
-            days.delete(0, "end")
+        # UPDATE ROOM STATUS
+        cur.execute("""
+        UPDATE rooms
+        SET status='Booked',
+            check_in=%s,
+            check_out=%s
+        WHERE room_no=%s
+        """,
+        (
+            check_in,
+            check_out,
+            room.get()
+        ))
 
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+        conn.commit()
 
-    # BUTTON
+        messagebox.showinfo(
+            "Success",
+            f"Room Booked!\nBill: ₹{bill}\nCheck-in: {check_in}\nCheck-out: {check_out}"
+        )
+
+        # CLEAR INPUTS
+        name.delete(0,"end")
+        phone.delete(0,"end")
+        room.delete(0,"end")
+        days.delete(0,"end")
+
+    # BOOK BUTTON ← THIS WAS MISSING
     ctk.CTkButton(
         card,
         text="BOOK NOW",
-        fg_color="#1f6feb",
-        hover_color="#3b82f6",
-        height=40,
-        width=200,
+        fg_color="#2563eb",
+        hover_color="#1d4ed8",
+        width=220,
+        height=45,
+        font=("Arial",14,"bold"),
         command=book
     ).pack(pady=20)
+
+
+
 
 
 
@@ -506,7 +534,7 @@ def show_table(frame):
 
     table = ttk.Treeview(
         table_frame,
-        columns=("ID","Name","Phone","Room","Days","Bill"),
+        columns=("ID","Name","Phone","Room","Days","Bill","CheckIn","Status"),
         show="headings",
         yscrollcommand=scroll_y.set
     )
@@ -514,7 +542,7 @@ def show_table(frame):
     scroll_y.config(command=table.yview)
     scroll_y.pack(side="right", fill="y")
 
-    for col in ("ID","Name","Phone","Room","Days","Bill"):
+    for col in ("ID","Name","Phone","Room","Days","Bill","CheckIn","Status"):
         table.heading(col, text=col)
         table.column(col, anchor="center", width=120)
 
@@ -533,12 +561,59 @@ def show_table(frame):
             """
             cur.execute(query, (f"%{filter_text}%", f"%{filter_text}%"))
         else:
-            cur.execute("SELECT * FROM bookings")
+            cur.execute("""
+            SELECT id,name,phone,room_no,days,bill,booking_date,status
+            FROM bookings
+            """)
 
         rows = cur.fetchall()
 
         for row in rows:
-            table.insert("", "end", values=row)
+
+            formatted_date = row[6].strftime("%d-%m-%Y %I:%M %p")
+
+        new_row = (
+        row[0],   # ID
+        row[1],   # Name
+        row[2],   # Phone
+        row[3],   # Room
+        row[4],   # Days
+        row[5],   # Bill
+        formatted_date,
+        row[7]
+    )
+
+        status = row[7]
+
+        if status == "Vacated":
+
+            table.insert(
+            "",
+            "end",
+            values=new_row,
+            tags=("vacated",)
+        )
+
+        else:
+  
+            table.insert(
+            "",
+            "end",
+            values=new_row,
+            tags=("booked",)
+        )
+
+        table.tag_configure(
+    "vacated",
+    background="#facc15",
+    foreground="black"
+)
+
+        table.tag_configure(
+    "booked",
+    background="#2b2b2b",
+    foreground="white"
+)
 
     load_data()
 
@@ -576,52 +651,21 @@ def delete_booking_ui(frame):
     for widget in frame.winfo_children():
         widget.destroy()
 
-    # TITLE
     ctk.CTkLabel(
         frame,
-        text="DELETE BOOKING",
+        text="MANAGE BOOKINGS (VACATE / DELETE)",
         font=("Arial", 24, "bold")
     ).pack(pady=15)
-
-    # INFO CARD
-    info = ctk.CTkFrame(frame, fg_color="#1e1e1e", corner_radius=15)
-    info.pack(pady=10, padx=20, fill="x")
-
-    ctk.CTkLabel(
-        info,
-        text="Select a booking from list and delete it",
-        font=("Arial", 14)
-    ).pack(pady=10)
 
     # TABLE FRAME
     table_frame = ctk.CTkFrame(frame, fg_color="#1e1e1e")
     table_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-    # STYLE
-    style = ttk.Style()
-    style.theme_use("default")
-
-    style.configure(
-        "Treeview",
-        background="#2b2b2b",
-        foreground="white",
-        rowheight=30,
-        fieldbackground="#2b2b2b"
-    )
-
-    style.configure(
-        "Treeview.Heading",
-        background="#111",
-        foreground="white",
-        font=("Arial", 11, "bold")
-    )
-
-    # SCROLLBAR
     scroll = ttk.Scrollbar(table_frame, orient="vertical")
 
     table = ttk.Treeview(
         table_frame,
-        columns=("ID","Name","Phone","Room","Days","Bill"),
+        columns=("ID","Name","Phone","Room","Days","Bill","CheckIn","Status"),
         show="headings",
         yscrollcommand=scroll.set
     )
@@ -629,59 +673,143 @@ def delete_booking_ui(frame):
     scroll.config(command=table.yview)
     scroll.pack(side="right", fill="y")
 
-    for col in ("ID","Name","Phone","Room","Days","Bill"):
+    for col in ("ID","Name","Phone","Room","Days","Bill","CheckIn","Status"):
         table.heading(col, text=col)
         table.column(col, anchor="center", width=120)
 
-    # LOAD DATA
     conn = connect()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM bookings")
+    cur.execute("""
+SELECT id,name,phone,room_no,days,bill,booking_date,status
+FROM bookings
+""")
     rows = cur.fetchall()
 
     for row in rows:
-        table.insert("", "end", values=row)
+
+        formatted_date = row[6].strftime("%d-%m-%Y %I:%M %p")
+
+    new_row = (
+        row[0],   # ID
+        row[1],   # Name
+        row[2],   # Phone
+        row[3],   # Room
+        row[4],   # Days
+        row[5],   # Bill
+        formatted_date,
+        row[7]
+    )
+
+    status = row[7]
+
+    if status == "Vacated":
+
+        table.insert(
+            "",
+            "end",
+            values=new_row,
+            tags=("vacated",)
+        )
+
+    else:
+
+        table.insert(
+            "",
+            "end",
+            values=new_row,
+            tags=("booked",)
+        )
+    table.tag_configure(
+    "vacated",
+    background="#facc15",
+    foreground="black"
+)
+
+    table.tag_configure(
+    "booked",
+    background="#2b2b2b",
+    foreground="white"
+)
 
     table.pack(fill="both", expand=True)
 
-    # DELETE FUNCTION
-    def delete_selected():
+    # STORE SELECTED ROW
+    selected_data = {"id": None, "room": None}
 
+    def on_select(event):
         selected = table.focus()
+        data = table.item(selected)["values"]
+        if data:
+            selected_data["id"] = data[0]
+            selected_data["room"] = data[3]
 
-        if not selected:
-            messagebox.showerror("Error", "Please select a booking first")
+    table.bind("<<TreeviewSelect>>", on_select)
+
+    # ================= VACATE =================
+    def vacate():
+
+        if not selected_data["id"]:
+            messagebox.showerror("Error", "Select a booking first")
             return
 
-        data = table.item(selected)["values"]
-        booking_id = data[0]
+        conn = connect()
+        cur = conn.cursor()
 
-        confirm = messagebox.askyesno(
-            "Confirm Delete",
-            f"Delete booking ID {booking_id}?"
-        )
+        cur.execute("UPDATE bookings SET status='Vacated' WHERE id=%s",
+                    (selected_data["id"],))
+
+        cur.execute("UPDATE rooms SET status='Available' WHERE room_no=%s",
+                    (selected_data["room"],))
+
+        conn.commit()
+
+        messagebox.showinfo("Success", "Room marked as VACATED")
+        delete_booking_ui(frame)
+
+    # ================= DELETE =================
+    def delete():
+
+        if not selected_data["id"]:
+            messagebox.showerror("Error", "Select a booking first")
+            return
+
+        confirm = messagebox.askyesno("Confirm", "Delete booking permanently?")
 
         if confirm:
+
             conn = connect()
             cur = conn.cursor()
 
-            cur.execute("DELETE FROM bookings WHERE id=%s", (booking_id,))
+            cur.execute("DELETE FROM bookings WHERE id=%s",
+                        (selected_data["id"],))
+
+            cur.execute("UPDATE rooms SET status='Available' WHERE room_no=%s",
+                        (selected_data["room"],))
+
             conn.commit()
 
-            messagebox.showinfo("Success", "Booking deleted successfully")
-
-            # refresh
+            messagebox.showinfo("Success", "Booking Deleted")
             delete_booking_ui(frame)
 
-    # BUTTON
+    # ================= BUTTONS =================
+    btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
+    btn_frame.pack(pady=10)
+
     ctk.CTkButton(
-        frame,
-        text="🗑 DELETE SELECTED",
+        btn_frame,
+        text="🟡 VACATE ROOM",
+        fg_color="#f59e0b",
+        hover_color="#d97706",
+        command=vacate
+    ).pack(side="left", padx=10)
+
+    ctk.CTkButton(
+        btn_frame,
+        text="🔴 DELETE BOOKING",
         fg_color="#dc2626",
         hover_color="#ef4444",
-        height=40,
-        command=delete_selected
-    ).pack(pady=10)
+        command=delete
+    ).pack(side="left", padx=10)
 
 
 
