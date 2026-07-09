@@ -32,3 +32,25 @@ It provides a modern GUI for managing hotel rooms, bookings, and customer record
 ## 🗄 Database Setup
 
 Run SQL Queries before starting project
+
+## 📸 Screenshots
+
+### 🔐 Login Page
+
+![Login](Screenshots/login.png)
+
+### 🏨 Rooms Page
+
+![Rooms](Screenshots/rooms.png)
+
+### 📝 Booking Page
+
+![Booking](Screenshots/booking.png)
+
+### 📋 View Bookings
+
+![View Bookings](Screenshots/viewbookings.png)
+
+### ❌ Delete Booking
+
+![Delete Booking](Screenshots/deletebookings.png)
